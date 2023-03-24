@@ -6,11 +6,11 @@ const bodyParser = require("body-parser")
 const ejs = require("ejs")
 const mongoose = require("mongoose")
 const app = express()
+const { Schema } = require('mongoose');
 
-// Including field encryption
-const Schema = mongoose.Schema;
-const mongooseFieldEncryption = require("mongoose-field-encryption").fieldEncryption;
-// Including field encryption
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
+// Including encryption ^
 
 app.use(express.static("public"))
 app.set('view engine', 'ejs')
@@ -18,27 +18,14 @@ app.use(bodyParser.urlencoded({ extended: true }))
 
 mongoose.connect(process.env.CONNECT)
 
+
 const userSchema = new Schema({
     email: String,
     password: String
 })
 
-userSchema.plugin(mongooseFieldEncryption, { 
-  fields: ["password"], 
-  secret: SECRET_KEY,
-  saltGenerator: function (secret) {
-    return "1234567890123456"; 
-    // should ideally use the secret to return a string of length 16, 
-    // default = `const defaultSaltGenerator = secret => crypto.randomBytes(16);`, 
-    // see options for more details
-  },
-});
-
 const User = mongoose.model("User", userSchema)
-
-
-
-
+// Including the schema/collection in MongoDB ^
 
 
 app.get("/", function(req, res){
@@ -62,8 +49,8 @@ app.get("/secrets", function(req, res){
 app.post("/register", async function(req,res){
   const newUser = new User({
       email: req.body.username,
-      password: req.body.password
-   })
+      password: await bcrypt.hash(req.body.password, saltRounds)
+    })
    try {
     await newUser.save()
     res.redirect("/secrets")
@@ -81,7 +68,7 @@ app.post("/login", async function(req, res) {
       const foundUser = await User.findOne({ email: username }).exec();
       
       if (foundUser) {
-        if (foundUser.password === password) {
+        if (await bcrypt.compare(password, foundUser.password)) {
           res.redirect("/secrets");
         } else {
           res.status(401).send("Invalid password");
@@ -95,13 +82,6 @@ app.post("/login", async function(req, res) {
     }
   });
   
-
-
-
-
-
-
-
 
 
 
